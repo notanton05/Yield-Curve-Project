@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>US Treasury Yield Curve Model</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{background:#f7f6f2;color:#1a1a1a;padding:20px;line-height:1.5;font-size:14px}
+.container{max-width:1200px;margin:0 auto}
+h1{font-size:22px;font-weight:500;margin-bottom:2px}
+.sub{font-size:13px;color:#5f5e5a;margin-bottom:14px}
+.data-banner{background:#EAF3DE;border:1px solid #C0DD97;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#3B6D11}
+.data-banner b{color:#1a1a1a}
+.update-banner{background:#E6F1FB;border:1px solid #B5D4F4;border-radius:8px;padding:12px 16px;margin-bottom:10px;font-size:12.5px;color:#185FA5;line-height:1.55}
+.update-banner b{color:#1a1a1a}
+.update-banner i{background:#fff;padding:2px 8px;border-radius:4px;font-style:normal;color:#1a1a1a;border:1px solid #B5D4F4}
+.update-banner code{background:#fff;padding:1px 6px;border-radius:3px;font-family:Monaco,Consolas,monospace;font-size:11px;color:#1a1a1a}
+.linkage-banner{background:#FAEEDA;border:1px solid #FAC775;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#854F0B}
+.linkage-banner b{color:#1a1a1a}
+.row.linked{background:#FFF8E1;border-radius:6px;padding:2px 4px;transition:background .3s}
+.row.linked label::after{content:" ⇆";color:#854F0B;font-weight:600;margin-left:3px;font-size:10px}
+.linkage-pulse{animation:pulse 0.6s ease}
+@keyframes pulse{0%{background:#FAEEDA}50%{background:#FAC775}100%{background:transparent}}
+.tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #e0deda}
+.tab{padding:8px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#5f5e5a;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab:hover{color:#1a1a1a}
+.tab.active{color:#185FA5;border-bottom-color:#185FA5}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.top-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.scenarios{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sc-btn{font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#5f5e5a;cursor:pointer}
+.sc-btn:hover{background:#f1efe8}
+.sc-btn.active{border-color:#185FA5;color:#185FA5;background:#E6F1FB}
+.act-btn{font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#1a1a1a;cursor:pointer;font-weight:500}
+.act-btn:hover{background:#f1efe8;border-color:#185FA5;color:#185FA5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px 18px}
+.card-full{grid-column:1/-1}
+.section-label{font-size:11px;font-weight:600;color:#5f5e5a;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.row label{font-size:12.5px;color:#5f5e5a;width:210px;flex-shrink:0}
+.row input[type=range]{flex:1;accent-color:#185FA5;height:4px}
+.val{font-size:12.5px;font-weight:600;min-width:52px;text-align:right;color:#1a1a1a}
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.metric{background:#f1efe8;border-radius:8px;padding:10px 12px;text-align:center}
+.mlabel{font-size:11px;color:#5f5e5a;margin-bottom:2px}
+.mval{font-size:17px;font-weight:600}
+.mval.up{color:#3B6D11}
+.mval.down{color:#993C1D}
+.shape-badge{display:inline-block;padding:4px 12px;border-radius:6px;font-weight:600;font-size:12px}
+.impact-title{font-size:11px;font-weight:600;color:#5f5e5a;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.impact-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.impact-name{font-size:12px;color:#5f5e5a;width:180px;flex-shrink:0}
+.impact-bar-wrap{flex:1;background:#f1efe8;border-radius:4px;height:14px;overflow:hidden}
+.impact-bar{height:100%;border-radius:4px}
+.impact-bar.pos{background:#185FA5}
+.impact-bar.neg{background:#993C1D}
+.impact-val{font-size:11px;font-weight:600;min-width:42px;text-align:right}
+.weights-intro{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px 20px;margin-bottom:14px;font-size:13px;color:#5f5e5a;line-height:1.6}
+.wgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wcard{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px 18px}
+.wrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wrow input[type=range]{flex:1;accent-color:#534AB7}
+.wval{font-size:12px;font-weight:600;min-width:38px;text-align:right;color:#534AB7}
+.ex-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px 20px;margin-bottom:14px}
+.ex-card h3{font-size:14px;font-weight:600;margin-bottom:6px}
+.ex-card p{font-size:13px;color:#5f5e5a;line-height:1.65;margin-bottom:6px}
+.ex-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+.ex-table th{text-align:left;padding:6px 10px;background:#f7f6f2;font-weight:600;color:#5f5e5a;font-size:11px;text-transform:uppercase}
+.ex-table td{padding:7px 10px;border-top:1px solid #f1efe8;vertical-align:top}
+.legend-row{display:flex;gap:16px;font-size:11px;color:#5f5e5a;margin-bottom:6px}
+.leg-solid{width:18px;height:2.5px;background:#185FA5;display:inline-block}
+.leg-dash{width:18px;height:0;border-top:1.5px dashed #3B6D11;display:inline-block}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>US Treasury yield curve model</h1>
+<div style="font-size:12px;color:#888780;margin-bottom:6px;font-style:italic">Made by Anton Vu</div>
+<div class="sub">20-factor macro model with adjustable weights and full methodology</div>
+
+<!-- ============================================================ -->
+<!-- ★★★ BASELINE DATA — EDIT THIS BLOCK TO UPDATE THE MODEL ★★★ -->
+<!-- This is the ONLY section you ever need to change.            -->
+<!-- ============================================================ -->
+
+<div class="data-banner">
+  <b>Data as of:</b> <span id="data-date">May 29, 2026</span> &nbsp;·&nbsp;
+  Yields: 3M 3.62% / 2Y 3.92% / 10Y 4.44% / 30Y 4.97% &nbsp;·&nbsp;
+  Oil $91 · CPI 3.8% · PCE 3.3% · Fed 3.63%
+</div>
+
+<div class="update-banner">
+  <b>🔄 How to update this model with fresh data:</b>
+  Open a new Claude conversation, paste this file in, and say: <i>"Update the baseline data block at the top to today's macro factors — yields, CPI, PCE, Fed funds, oil, etc."</i> Claude will pull current data and return the file with only the BASELINE_DATA section changed. Everything else stays identical.
+  <br><br>
+  <b>Power user:</b> You can also edit it yourself. Scroll down to the block marked <code>★★★ BASELINE DATA ★★★</code> — change any number, save, and reload. Every value is clearly labeled.
+</div>
+
+<div class="linkage-banner">
+  <b>⚡ Macro linkages:</b>
+  <label style="margin-left:8px;cursor:pointer">
+    <input type="checkbox" id="linkages-toggle" style="vertical-align:middle;accent-color:#185FA5"> 
+    <span style="font-weight:500">Enable dynamic factor linkages</span>
+  </label>
+  <span style="color:#5f5e5a;margin-left:6px">— when on, moving one factor automatically adjusts related factors (e.g. CPI up → Fed hike probability up)</span>
+</div>
+
+<script id="BASELINE_DATA" type="application/json">
+{
+  "asOf": "May 29, 2026",
+  "yields": {
+    "3M": 3.62, "6M": 3.71, "1Y": 3.74, "2Y": 3.92,
+    "5Y": 4.10, "10Y": 4.44, "20Y": 4.96, "30Y": 4.97
+  },
+  "factors": {
+    "fed": 3.625,
+    "hikep": 42,
+    "qt": 40,
+    "cpi": 3.8,
+    "pce": 3.3,
+    "bei": 2.58,
+    "gdp": 2.4,
+    "unemp": 4.4,
+    "recprob": 28,
+    "deficit": 5.8,
+    "termprem": 60,
+    "auctdem": 47,
+    "oil": 91,
+    "hormuz": 35,
+    "gpri": 52,
+    "igspread": 118,
+    "dxy": 104,
+    "foreignd": 50,
+    "aicapex": 75,
+    "aiprod": 45,
+    "techsup": 20,
+    "tariff": 12,
+    "china": 58,
+    "tradeinf": 25
+  }
+}
+</script>
+
+<!-- ============================================================ -->
+<!-- ★★★ END OF EDITABLE DATA BLOCK ★★★                          -->
+<!-- ============================================================ -->
+
+<div class="tabs">
+  <div class="tab active" data-tab="model">Model</div>
+  <div class="tab" data-tab="weights">Weights</div>
+  <div class="tab" data-tab="linkages">Linkages</div>
+  <div class="tab" data-tab="explainer">Explainer</div>
+</div>
+
+<div id="tab-model" class="tab-content active">
+
+<div class="top-bar">
+  <div class="scenarios">
+    <span style="font-size:12px;color:#5f5e5a">Scenarios:</span>
+    <button class="sc-btn active" data-s="current">Current</button>
+    <button class="sc-btn" data-s="iran">Iran resolved</button>
+    <button class="sc-btn" data-s="hike">Rate hike</button>
+    <button class="sc-btn" data-s="stag">Stagflation</button>
+    <button class="sc-btn" data-s="soft">Soft landing</button>
+    <button class="sc-btn" data-s="rec">Recession</button>
+    <button class="sc-btn" data-s="ai">AI boom</button>
+  </div>
+  <button class="act-btn" id="reset-btn">Reset all</button>
+</div>
+
+<div class="grid" id="factor-grid"></div>
+
+<div class="metrics" id="metrics"></div>
+
+<div class="card card-full" style="margin-bottom:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <div class="section-label" style="margin-bottom:0">Implied yield curve</div>
+    <div id="shape-label"></div>
+  </div>
+  <div class="legend-row">
+    <span><span class="leg-solid"></span> Model output</span>
+    <span><span class="leg-dash"></span> Actual <span id="actual-date">May 29</span></span>
+  </div>
+  <div style="height:280px"><canvas id="yc"></canvas></div>
+</div>
+
+<div class="card card-full">
+  <div class="impact-title">Factor impact on 10yr yield from baseline</div>
+  <div id="impact-bars"></div>
+</div>
+
+</div>
+
+<div id="tab-weights" class="tab-content">
+<div class="weights-intro">
+  <b>What is a weight?</b> Each factor has a sensitivity weight controlling how much it moves the 10yr yield when you drag its slider. A weight of 0.20 means a 1-unit increase adds 20bp to the 10yr.<br><br>
+  <b>How to use:</b> Adjust the multiplier (0% to 300%) if you think the model is over- or under-weighting a factor. Reset weights restores defaults.
+</div>
+<div class="top-bar" style="margin-bottom:14px">
+  <div style="font-size:13px;color:#5f5e5a">Adjust 10yr sensitivity for the most important factors</div>
+  <button class="act-btn" id="reset-weights-btn">Reset weights</button>
+</div>
+<div class="wgrid" id="wgrid"></div>
+</div>
+
+<div id="tab-linkages" class="tab-content">
+<div class="weights-intro">
+  <b>What are linkages?</b> Macro factors do not move independently. When inflation spikes, the Fed reacts. When the labor market weakens, recession risk rises. The linkages below capture the most empirically robust of these relationships. Toggle <b>"Enable dynamic factor linkages"</b> at the top of the model to activate them — dragging one slider will then automatically adjust related sliders.<br><br>
+  <b>When to use them:</b> Realistic scenario testing (e.g. "what if CPI prints 5.5%?"). <b>When NOT to use them:</b> Isolating the pure effect of a single variable.
+</div>
+<div class="card card-full">
+<table class="ex-table">
+<thead><tr><th>Trigger</th><th>Causes</th><th>Coefficient</th><th>Mechanism</th></tr></thead>
+<tbody id="linkages-table"></tbody>
+</table>
+</div>
+</div>
+
+<div id="tab-explainer" class="tab-content">
+
+<div class="ex-card">
+<h3>How the model works</h3>
+<p>This is a <b>delta-sensitivity model</b> anchored to actual US Treasury yields. The model starts from real market levels and calculates how much each factor would move the curve if it shifted from its baseline value.</p>
+<p>The math: Implied yield = Actual yield + sum of (weight times delta) for each tenor. Delta is the change in a factor from its baseline.</p>
+<p>This approach is grounded in the Adrian-Crump-Moench term structure decomposition used by the NY Fed.</p>
+</div>
+
+<div class="ex-card">
+<h3>The 20 factors ranked by importance to the 10yr yield</h3>
+<table class="ex-table">
+<thead><tr><th>#</th><th>Factor</th><th>Curve impact</th><th>Why it matters now</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><b>Fed funds rate</b></td><td>Short end</td><td>Primary short-end anchor. Held at 3.5-3.75%.</td></tr>
+<tr><td>2</td><td><b>CPI inflation</b></td><td>Whole curve</td><td>CPI at 3.8% YoY keeps long yields elevated.</td></tr>
+<tr><td>3</td><td><b>Term premium</b></td><td>Long end</td><td>NY Fed ACM model at 60bp - highest since 2014.</td></tr>
+<tr><td>4</td><td><b>Fiscal deficit</b></td><td>Long end</td><td>5.8% of GDP requires ~$2T annual issuance.</td></tr>
+<tr><td>5</td><td><b>Breakeven inflation</b></td><td>Long end</td><td>TIPS-implied expectations at 2.58%.</td></tr>
+<tr><td>6</td><td><b>Fed hike probability</b></td><td>Short end</td><td>~42% odds of a hike by Dec 2026.</td></tr>
+<tr><td>7</td><td><b>Brent crude</b></td><td>Whole curve</td><td>At $91, direct inflation input.</td></tr>
+<tr><td>8</td><td><b>Hormuz risk</b></td><td>Long end</td><td>Easing on US-Iran ceasefire reports.</td></tr>
+<tr><td>9</td><td><b>Foreign UST demand</b></td><td>Long end</td><td>China and others diversifying away.</td></tr>
+<tr><td>10</td><td><b>Core PCE</b></td><td>Whole curve</td><td>Fed's preferred measure at 3.3% YoY.</td></tr>
+<tr><td>11</td><td><b>AI capex intensity</b></td><td>Long end</td><td>Hyperscaler bond issuance pressures long end.</td></tr>
+<tr><td>12</td><td><b>Auction demand</b></td><td>Long end</td><td>Bid-to-cover ratios at 10yr/30yr auctions.</td></tr>
+<tr><td>13</td><td><b>GDP growth</b></td><td>Whole curve</td><td>2.4% - solid but not overheating.</td></tr>
+<tr><td>14</td><td><b>Recession probability</b></td><td>Short end</td><td>Estrella-Mishkin model at 28%.</td></tr>
+<tr><td>15</td><td><b>Tariff rate</b></td><td>Whole curve</td><td>12% effective rate - inflationary at long end.</td></tr>
+<tr><td>16</td><td><b>IG credit spreads</b></td><td>Long end</td><td>118bp - moderate stress level.</td></tr>
+<tr><td>17</td><td><b>USD strength</b></td><td>Long end</td><td>DXY 104 - moderately strong.</td></tr>
+<tr><td>18</td><td><b>Geopolitical risk</b></td><td>Long end</td><td>Captures broad uncertainty premium.</td></tr>
+<tr><td>19</td><td><b>AI productivity</b></td><td>Long end</td><td>Higher potential GDP - bullish for yields.</td></tr>
+<tr><td>20</td><td><b>QT pace</b></td><td>Long end</td><td>Fed removes ~$40bn/month of demand.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="ex-card">
+<h3>Model limitations</h3>
+<p><b>Linear approximation:</b> Real yield dynamics are non-linear in extreme stress.</p>
+<p><b>Factor correlation:</b> Real factors move together; this model treats them independently.</p>
+<p><b>Not a trading model:</b> This is a scenario analysis and communication tool.</p>
+</div>
+
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// MODEL CODE - You should not need to edit anything below.
+// All updateable values live in the BASELINE_DATA block above.
+// ============================================================
+
+var DATA = JSON.parse(document.getElementById('BASELINE_DATA').textContent);
+document.getElementById('data-date').textContent = DATA.asOf;
+document.getElementById('actual-date').textContent = DATA.asOf;
+
+var TENORS = ['3M','6M','1Y','2Y','5Y','10Y','20Y','30Y'];
+var LIVE = TENORS.map(function(t){ return DATA.yields[t]; });
+
+var FACTOR_DEFS = [
+  {id:'fed',     label:'Fed funds rate',         section:1, min:0, max:8, step:0.25, fmt:function(x){return x.toFixed(2)+'%';}},
+  {id:'hikep',   label:'Fed hike probability',   section:1, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'qt',      label:'QT pace ($bn/mo)',       section:1, min:0, max:120, step:5,  fmt:function(x){return '$'+x+'B';}},
+  {id:'cpi',     label:'CPI YoY',                section:2, min:0, max:12, step:0.1, fmt:function(x){return x.toFixed(1)+'%';}},
+  {id:'pce',     label:'Core PCE YoY',           section:2, min:0, max:8, step:0.1,  fmt:function(x){return x.toFixed(1)+'%';}},
+  {id:'bei',     label:'Breakeven inflation',    section:2, min:1, max:5, step:0.05, fmt:function(x){return x.toFixed(2)+'%';}},
+  {id:'gdp',     label:'GDP growth YoY',         section:3, min:-4, max:6, step:0.1, fmt:function(x){return x.toFixed(1)+'%';}},
+  {id:'unemp',   label:'Unemployment rate',      section:3, min:2, max:12, step:0.1, fmt:function(x){return x.toFixed(1)+'%';}},
+  {id:'recprob', label:'Recession probability',  section:3, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'deficit', label:'Deficit / GDP',          section:4, min:0, max:15, step:0.1, fmt:function(x){return x.toFixed(1)+'%';}},
+  {id:'termprem',label:'Term premium (bp)',      section:4, min:-50, max:250, step:5,fmt:function(x){return x.toFixed(0)+'bp';}},
+  {id:'auctdem', label:'Auction demand',         section:4, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'oil',     label:'Brent crude',            section:5, min:30, max:180, step:1, fmt:function(x){return '$'+x.toFixed(0);}},
+  {id:'hormuz',  label:'Hormuz risk',            section:5, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'gpri',    label:'Geopolitical risk idx',  section:5, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0);}},
+  {id:'igspread',label:'IG credit spread',       section:6, min:0, max:400, step:5,  fmt:function(x){return x.toFixed(0)+'bp';}},
+  {id:'dxy',     label:'DXY (USD strength)',     section:6, min:80, max:130, step:0.5,fmt:function(x){return x.toFixed(0);}},
+  {id:'foreignd',label:'Foreign UST demand',     section:6, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'aicapex', label:'AI capex intensity',     section:7, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'aiprod',  label:'AI productivity boost',  section:7, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0)+'%';}},
+  {id:'techsup', label:'Tech bond supply (bp)',  section:7, min:0, max:80, step:5,   fmt:function(x){return x.toFixed(0)+'bp';}},
+  {id:'tariff',  label:'Effective tariff rate',  section:8, min:0, max:30, step:0.5, fmt:function(x){return x.toFixed(1)+'%';}},
+  {id:'china',   label:'China-US tension',       section:8, min:0, max:100, step:1,  fmt:function(x){return x.toFixed(0);}},
+  {id:'tradeinf',label:'Trade inflation (bp)',   section:8, min:0, max:80, step:5,   fmt:function(x){return x.toFixed(0)+'bp';}}
+];
+
+var SECTION_NAMES = {
+  1:'1. Monetary policy', 2:'2. Inflation', 3:'3. Growth and labor', 4:'4. Fiscal and supply',
+  5:'5. Geopolitical and energy', 6:'6. Global and credit', 7:'7. AI and technology', 8:'8. Trade and tariffs'
+};
+
+var BASE_W = {
+  fed:      [0.92, 0.88, 0.78, 0.55, 0.28, 0.14, 0.10, 0.08],
+  hikep:    [0.007, 0.007, 0.006, 0.005, 0.003, 0.002, 0.001, 0.001],
+  qt:       [0.001, 0.001, 0.002, 0.002, 0.002, 0.0025, 0.002, 0.002],
+  cpi:      [0.015, 0.035, 0.065, 0.12, 0.17, 0.20, 0.18, 0.16],
+  pce:      [0.010, 0.020, 0.040, 0.08, 0.10, 0.12, 0.10, 0.09],
+  bei:      [0.005, 0.010, 0.020, 0.06, 0.12, 0.18, 0.16, 0.14],
+  gdp:      [0, 0.01, 0.03, 0.07, 0.10, 0.10, 0.08, 0.07],
+  unemp:    [-0.01, -0.01, -0.02, -0.05, -0.06, -0.06, -0.04, -0.04],
+  recprob:  [-0.004, -0.005, -0.007, -0.008, -0.007, -0.005, -0.004, -0.003],
+  deficit:  [0, 0.001, 0.002, 0.004, 0.007, 0.010, 0.012, 0.012],
+  termprem: [0, 0.001, 0.002, 0.004, 0.006, 0.009, 0.011, 0.011],
+  auctdem:  [-0.001, -0.001, -0.001, -0.002, -0.003, -0.005, -0.005, -0.005],
+  oil:      [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.005, 0.005],
+  hormuz:   [0.001, 0.001, 0.002, 0.002, 0.003, 0.004, 0.004, 0.004],
+  gpri:     [0.0005, 0.001, 0.001, 0.002, 0.002, 0.003, 0.003, 0.003],
+  igspread: [0, 0.001, 0.001, 0.002, 0.003, 0.003, 0.003, 0.003],
+  dxy:      [-0.001, -0.001, -0.001, -0.002, -0.002, -0.002, -0.001, -0.001],
+  foreignd: [-0.001, -0.001, -0.002, -0.002, -0.003, -0.005, -0.005, -0.005],
+  aicapex:  [0, 0, 0.001, 0.002, 0.004, 0.005, 0.006, 0.007],
+  aiprod:   [0, 0, -0.001, -0.001, -0.002, -0.003, -0.002, -0.002],
+  techsup:  [0.001, 0.001, 0.001, 0.002, 0.003, 0.004, 0.004, 0.004],
+  tariff:   [0.002, 0.003, 0.004, 0.005, 0.006, 0.006, 0.005, 0.005],
+  china:    [0.001, 0.001, 0.001, 0.002, 0.002, 0.003, 0.003, 0.003],
+  tradeinf: [0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.006, 0.006]
+};
+
+var WMULT = {};
+FACTOR_DEFS.forEach(function(f){ WMULT[f.id] = 1.0; });
+
+var SCENARIOS = {
+  current: {},
+  iran:    {oil:62, hormuz:5, gpri:25, cpi:2.5, pce:2.2, bei:2.20, hikep:15, recprob:12},
+  hike:    {fed:5.5, hikep:92, qt:90, cpi:5.5, pce:5.0, bei:3.1, gdp:1.6, unemp:4.6, recprob:38, oil:108},
+  stag:    {fed:4.5, hikep:70, qt:60, cpi:7.8, pce:7.2, bei:3.8, gdp:-0.5, unemp:6.5, recprob:72, oil:148, hormuz:88, deficit:10, termprem:180, igspread:240},
+  soft:    {oil:72, hormuz:12, cpi:2.2, pce:2.0, bei:2.15, hikep:8, recprob:7, fed:3.0, qt:20, gdp:2.9, unemp:3.9, deficit:5.0, termprem:28, igspread:82, auctdem:68, foreignd:62},
+  rec:     {fed:2.5, hikep:4, qt:0, cpi:1.9, pce:1.7, bei:1.9, gdp:-1.5, unemp:7.2, recprob:90, oil:60, hormuz:15, termprem:15, igspread:270, auctdem:75, foreignd:72, deficit:10},
+  ai:      {aicapex:100, aiprod:92, techsup:60, gdp:3.9, unemp:3.5, recprob:8, oil:78, hormuz:28, cpi:2.8, pce:2.5, bei:2.4, fed:3.5}
+};
+
+function buildFactorGrid() {
+  var grid = document.getElementById('factor-grid');
+  var bySection = {};
+  FACTOR_DEFS.forEach(function(f){
+    if (!bySection[f.section]) bySection[f.section] = [];
+    bySection[f.section].push(f);
+  });
+  var html = '';
+  Object.keys(bySection).forEach(function(s){
+    html += '<div class="card"><div class="section-label">' + SECTION_NAMES[s] + '</div>';
+    bySection[s].forEach(function(f){
+      var base = DATA.factors[f.id];
+      html += '<div class="row">' +
+        '<label>' + f.label + '</label>' +
+        '<input type="range" id="' + f.id + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" value="' + base + '">' +
+        '<span class="val" id="v-' + f.id + '"></span>' +
+      '</div>';
+    });
+    html += '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function g(id) { var el = document.getElementById(id); return el ? parseFloat(el.value) : 0; }
+function baseVal(id) { return DATA.factors[id]; }
+
+function computeYields() {
+  var deltas = TENORS.map(function(_, i){
+    return FACTOR_DEFS.reduce(function(sum, f){
+      var w = BASE_W[f.id];
+      if (!w) return sum;
+      var delta = g(f.id) - baseVal(f.id);
+      var mult = (i === 5) ? WMULT[f.id] : 1;
+      return sum + w[i] * delta * mult;
+    }, 0);
+  });
+  return LIVE.map(function(v, i){ return Math.max(0.05, +(v + deltas[i]).toFixed(3)); });
+}
+
+function computeImpacts() {
+  return FACTOR_DEFS.map(function(f){
+    var w = BASE_W[f.id];
+    if (!w) return {id:f.id, label:f.label, impact:0};
+    var delta = g(f.id) - baseVal(f.id);
+    var impact = w[5] * delta * WMULT[f.id];
+    return {id:f.id, label:f.label, impact:impact};
+  }).filter(function(x){ return Math.abs(x.impact) > 0.0005; })
+    .sort(function(a, b){ return Math.abs(b.impact) - Math.abs(a.impact); })
+    .slice(0, 10);
+}
+
+function getShape(y) {
+  var s = y[5] - y[3];
+  if (s < -0.15) return {l:'Inverted', c:'#993C1D', b:'#FAECE7'};
+  if (Math.abs(s) < 0.15) return {l:'Flat', c:'#854F0B', b:'#FAEEDA'};
+  if (y[4] > y[5] && y[4] > y[3]) return {l:'Humped', c:'#185FA5', b:'#E6F1FB'};
+  return {l:'Normal / Steepening', c:'#3B6D11', b:'#EAF3DE'};
+}
+
+function updateLabels() {
+  FACTOR_DEFS.forEach(function(f){
+    var el = document.getElementById(f.id);
+    var out = document.getElementById('v-' + f.id);
+    if (el && out) out.textContent = f.fmt(parseFloat(el.value));
+  });
+}
+
+function updateImpactBars() {
+  var impacts = computeImpacts();
+  var container = document.getElementById('impact-bars');
+  if (!impacts.length) {
+    container.innerHTML = '<div style="font-size:12px;color:#888;padding:8px 0">No factors moved from baseline yet. Drag a slider to see impact.</div>';
+    return;
+  }
+  var maxAbs = Math.max.apply(null, impacts.map(function(x){return Math.abs(x.impact);}).concat([0.01]));
+  container.innerHTML = impacts.map(function(x){
+    var pct = Math.min(100, Math.abs(x.impact) / maxAbs * 100);
+    var bp = (x.impact * 100).toFixed(1);
+    var pos = x.impact >= 0;
+    return '<div class="impact-row">' +
+      '<div class="impact-name">' + x.label + '</div>' +
+      '<div class="impact-bar-wrap"><div class="impact-bar ' + (pos?'pos':'neg') + '" style="width:' + pct + '%"></div></div>' +
+      '<div class="impact-val" style="color:' + (pos?'#185FA5':'#993C1D') + '">' + (pos?'+':'') + bp + 'bp</div>' +
+    '</div>';
+  }).join('');
+}
+
+var chart;
+function updateAll() {
+  updateLabels();
+  var y = computeYields();
+  var s = (y[5] - y[3]) * 100;
+  var sh = getShape(y);
+  document.getElementById('shape-label').innerHTML =
+    '<span class="shape-badge" style="background:' + sh.b + ';color:' + sh.c + '">' + sh.l + '</span>';
+  document.getElementById('metrics').innerHTML =
+    '<div class="metric"><div class="mlabel">2yr</div><div class="mval">' + y[3].toFixed(2) + '%</div></div>' +
+    '<div class="metric"><div class="mlabel">5yr</div><div class="mval">' + y[4].toFixed(2) + '%</div></div>' +
+    '<div class="metric"><div class="mlabel">10yr</div><div class="mval">' + y[5].toFixed(2) + '%</div></div>' +
+    '<div class="metric"><div class="mlabel">30yr</div><div class="mval">' + y[7].toFixed(2) + '%</div></div>' +
+    '<div class="metric"><div class="mlabel">2s10s</div><div class="mval ' + (s>=0?'up':'down') + '">' + (s>=0?'+':'') + s.toFixed(0) + 'bp</div></div>';
+  updateImpactBars();
+  if (!chart) {
+    chart = new Chart(document.getElementById('yc'), {
+      type: 'line',
+      data: {
+        labels: TENORS,
+        datasets: [
+          {label:'Model', data:y, borderColor:'#185FA5', backgroundColor:'rgba(55,138,221,0.08)', borderWidth:2.5, pointRadius:4, tension:0.35, fill:true},
+          {label:'Actual', data:LIVE.slice(), borderColor:'#3B6D11', borderWidth:1.5, pointRadius:3, borderDash:[4,4], tension:0.35, fill:false}
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:true, position:'bottom', labels:{font:{size:11}, boxWidth:20}}},
+        scales:{
+          y:{ticks:{callback:function(v){return v.toFixed(1)+'%';}, font:{size:11}}, min:0, suggestedMax:7},
+          x:{ticks:{font:{size:11}}}
+        }
+      }
+    });
+  } else {
+    chart.data.datasets[0].data = y;
+    chart.update('none');
+  }
+}
+
+function applyScenario(key) {
+  var overrides = SCENARIOS[key] || {};
+  FACTOR_DEFS.forEach(function(f){
+    var el = document.getElementById(f.id);
+    if (el) el.value = (overrides[f.id] !== undefined) ? overrides[f.id] : baseVal(f.id);
+  });
+  var btns = document.querySelectorAll('.sc-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-s') === key);
+  }
+  updateAll();
+}
+
+function resetAll() {
+  applyScenario('current');
+  resetWeights();
+}
+
+var WEIGHT_FACTORS = [
+  {id:'fed', label:'Fed funds rate', note:'Dominates short end, fades at long end'},
+  {id:'cpi', label:'CPI inflation', note:'Broad curve driver'},
+  {id:'termprem', label:'Term premium', note:'Pure long-end driver'},
+  {id:'deficit', label:'Fiscal deficit', note:'Long-end steepener'},
+  {id:'bei', label:'Breakeven inflation', note:'Embedded in long end'},
+  {id:'hikep', label:'Fed hike probability', note:'Reprices 2yr aggressively'},
+  {id:'oil', label:'Brent crude', note:'Inflation pass-through'},
+  {id:'hormuz', label:'Hormuz risk', note:'2026-specific risk premium'},
+  {id:'foreignd', label:'Foreign UST demand', note:'Structural long-end headwind'},
+  {id:'aicapex', label:'AI capex', note:'New 2026 supply driver'}
+];
+
+function renderWeightsTab() {
+  var container = document.getElementById('wgrid');
+  container.innerHTML = WEIGHT_FACTORS.map(function(wf){
+    var mult = WMULT[wf.id];
+    var pct = Math.round(mult * 100);
+    var baseW = BASE_W[wf.id][5];
+    return '<div class="wcard">' +
+      '<div class="section-label">' + wf.label + '</div>' +
+      '<div style="font-size:12px;color:#5f5e5a;margin-bottom:10px">' + wf.note + '</div>' +
+      '<div class="wrow">' +
+        '<label style="font-size:12px;width:170px;color:#5f5e5a">10yr multiplier</label>' +
+        '<input type="range" id="wm-' + wf.id + '" min="0" max="3" step="0.05" value="' + mult + '">' +
+        '<span class="wval" id="wv-' + wf.id + '">' + pct + '%</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:#5f5e5a;margin-top:6px">' +
+        'Base: <b>' + (baseW * 100).toFixed(1) + 'bp</b> → Effective: <b id="weff-' + wf.id + '">' + (baseW * mult * 100).toFixed(1) + 'bp</b>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  WEIGHT_FACTORS.forEach(function(wf){
+    var el = document.getElementById('wm-' + wf.id);
+    if (el) el.addEventListener('input', function(){ updateWeightMult(wf.id, this.value); });
+  });
+}
+
+function updateWeightMult(id, val) {
+  WMULT[id] = parseFloat(val);
+  var pct = Math.round(WMULT[id] * 100);
+  var vEl = document.getElementById('wv-' + id);
+  var eEl = document.getElementById('weff-' + id);
+  if (vEl) vEl.textContent = pct + '%';
+  if (eEl) eEl.textContent = (BASE_W[id][5] * WMULT[id] * 100).toFixed(1) + 'bp';
+  updateAll();
+}
+
+function resetWeights() {
+  FACTOR_DEFS.forEach(function(f){ WMULT[f.id] = 1.0; });
+  renderWeightsTab();
+  updateAll();
+}
+
+function renderLinkagesTable() {
+  var tbody = document.getElementById('linkages-table');
+  if (!tbody) return;
+  tbody.innerHTML = LINKAGES.map(function(l){
+    var fromDef = FACTOR_DEFS.find(function(f){return f.id === l.from;});
+    var toDef = FACTOR_DEFS.find(function(f){return f.id === l.to;});
+    var fromName = fromDef ? fromDef.label : l.from;
+    var toName = toDef ? toDef.label : l.to;
+    var arrow = l.coeff > 0 ? '↑ ↑' : '↑ ↓';
+    var color = l.coeff > 0 ? '#3B6D11' : '#993C1D';
+    return '<tr>' +
+      '<td><b>' + fromName + '</b></td>' +
+      '<td><b style="color:' + color + '">' + arrow + '</b> ' + toName + '</td>' +
+      '<td><code style="background:#f7f6f2;padding:1px 6px;border-radius:3px;font-size:11px">' + (l.coeff > 0 ? '+' : '') + l.coeff + '</code></td>' +
+      '<td style="color:#5f5e5a">' + l.note + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function switchTab(name) {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === name);
+  }
+  var contents = document.querySelectorAll('.tab-content');
+  for (var j = 0; j < contents.length; j++) {
+    contents[j].classList.toggle('active', contents[j].id === 'tab-' + name);
+  }
+  if (name === 'weights') renderWeightsTab();
+  if (name === 'linkages') renderLinkagesTable();
+}
+
+// Init
+buildFactorGrid();
+
+// ============================================================
+// MACRO LINKAGES - dynamic relationships between factors
+// Only fires when the toggle is on. Each linkage has:
+//   from: source factor
+//   to: target factor
+//   coeff: how much the target moves per 1-unit move of source (above its baseline)
+//   note: short explanation
+// ============================================================
+var LINKAGES = [
+  {from:'cpi',     to:'hikep',   coeff:8,    note:'Taylor rule: higher inflation → more hawkish Fed'},
+  {from:'cpi',     to:'bei',     coeff:0.15, note:'Inflation expectations track realized CPI'},
+  {from:'unemp',   to:'recprob', coeff:18,   note:'Sahm rule: rising unemployment predicts recession'},
+  {from:'unemp',   to:'hikep',   coeff:-7,   note:'Weak labor market → Fed cuts'},
+  {from:'recprob', to:'hikep',   coeff:-0.6, note:'Markets price cuts in recessions'},
+  {from:'oil',     to:'cpi',     coeff:0.025,note:'Energy is ~7% of CPI basket with pass-through'},
+  {from:'hormuz',  to:'oil',     coeff:0.55, note:'Direct supply disruption channel'},
+  {from:'hormuz',  to:'gpri',    coeff:0.7,  note:'Hormuz tension lifts broader geopolitical risk'},
+  {from:'deficit', to:'termprem',coeff:8,    note:'More issuance demands higher term premium'},
+  {from:'aicapex', to:'techsup', coeff:0.35, note:'AI capex is funded via corporate bond issuance'},
+  {from:'foreignd',to:'termprem',coeff:-0.4, note:'Less foreign demand → higher term premium needed'},
+  {from:'china',   to:'foreignd',coeff:-0.25,note:'China tension → less foreign UST demand'},
+  {from:'tariff',  to:'tradeinf',coeff:1.8,  note:'Tariffs pass through to consumer prices'},
+  {from:'tradeinf',to:'cpi',     coeff:0.012,note:'Trade inflation feeds into headline CPI'}
+];
+
+var linkagesEnabled = false;
+var applyingLinkages = false;
+
+function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+function applyLinkages(sourceId) {
+  if (!linkagesEnabled || applyingLinkages) return;
+  applyingLinkages = true;
+  var srcEl = document.getElementById(sourceId);
+  if (!srcEl) { applyingLinkages = false; return; }
+  var srcDelta = parseFloat(srcEl.value) - baseVal(sourceId);
+  var touched = {};
+  LINKAGES.forEach(function(link){
+    if (link.from !== sourceId) return;
+    var tgtEl = document.getElementById(link.to);
+    if (!tgtEl) return;
+    var tgtDef = FACTOR_DEFS.find(function(f){return f.id === link.to;});
+    if (!tgtDef) return;
+    var newVal = baseVal(link.to) + srcDelta * link.coeff;
+    newVal = clamp(newVal, tgtDef.min, tgtDef.max);
+    // round to step
+    newVal = Math.round(newVal / tgtDef.step) * tgtDef.step;
+    tgtEl.value = newVal;
+    touched[link.to] = true;
+    var row = tgtEl.closest('.row');
+    if (row) {
+      row.classList.remove('linkage-pulse');
+      void row.offsetWidth; // reflow to restart animation
+      row.classList.add('linkage-pulse');
+    }
+  });
+  applyingLinkages = false;
+  return touched;
+}
+
+function markLinkedRows() {
+  // Highlight rows that are part of a linkage when toggle is on
+  var rows = document.querySelectorAll('.row');
+  for (var i = 0; i < rows.length; i++) rows[i].classList.remove('linked');
+  if (!linkagesEnabled) return;
+  var involved = {};
+  LINKAGES.forEach(function(l){ involved[l.from] = true; involved[l.to] = true; });
+  Object.keys(involved).forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) {
+      var row = el.closest('.row');
+      if (row) row.classList.add('linked');
+    }
+  });
+}
+
+document.getElementById('linkages-toggle').addEventListener('change', function(){
+  linkagesEnabled = this.checked;
+  markLinkedRows();
+});
+
+var rangeInputs = document.querySelectorAll('#factor-grid input[type=range]');
+for (var i = 0; i < rangeInputs.length; i++) {
+  rangeInputs[i].addEventListener('input', function(){
+    applyLinkages(this.id);
+    updateAll();
+    var btns = document.querySelectorAll('.sc-btn');
+    for (var k = 0; k < btns.length; k++) btns[k].classList.remove('active');
+  });
+}
+
+document.getElementById('reset-btn').addEventListener('click', resetAll);
+document.getElementById('reset-weights-btn').addEventListener('click', resetWeights);
+
+var scBtns = document.querySelectorAll('.sc-btn');
+for (var b = 0; b < scBtns.length; b++) {
+  scBtns[b].addEventListener('click', function(){ applyScenario(this.getAttribute('data-s')); });
+}
+
+var tabBtns = document.querySelectorAll('.tab');
+for (var t = 0; t < tabBtns.length; t++) {
+  tabBtns[t].addEventListener('click', function(){ switchTab(this.getAttribute('data-tab')); });
+}
+
+applyScenario('current');
+</script>
+
+</body>
+</html>
